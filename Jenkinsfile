@@ -4,15 +4,16 @@ pipeline {
 
     environment {
 
-        IMAGE_NAME =
-            'jaganathbkvin/server-health-monitor'
+        IMAGE_NAME = 'jaganathbkvin/server-health-monitor'
+        IMAGE_TAG  = "build-${BUILD_NUMBER}"
 
-        IMAGE_TAG =
-            "build-${BUILD_NUMBER}"
     }
 
     stages {
 
+        // ==========================================
+        // 1. CHECKOUT
+        // ==========================================
 
         stage('Checkout') {
 
@@ -21,15 +22,22 @@ pipeline {
                 echo 'Checking out source code...'
 
                 checkout scm
+
             }
         }
 
+
+        // ==========================================
+        // 2. VERIFY PROJECT FILES
+        // ==========================================
 
         stage('Verify Files') {
 
             steps {
 
                 powershell '''
+                    Write-Host "Checking project files..."
+
                     $requiredFiles = @(
                         "app.py",
                         "requirements.txt",
@@ -43,7 +51,7 @@ pipeline {
 
                         if (!(Test-Path $file)) {
 
-                            Write-Error "$file not found"
+                            Write-Error "$file NOT FOUND"
 
                             exit 1
                         }
@@ -51,60 +59,99 @@ pipeline {
                         Write-Host "$file found"
                     }
 
-                    Write-Host "All required files verified."
+                    Write-Host ""
+                    Write-Host "All required files verified successfully."
                 '''
+
             }
         }
 
 
-        stage('Install Dependencies') {
-
-            steps {
-
-                powershell '''
-                    python --version
-
-                    python -m pip install `
-                        --disable-pip-version-check `
-                        -r requirements.txt
-                '''
-            }
-        }
-
+        // ==========================================
+        // 3. TEST PYTHON APPLICATION
+        // ==========================================
 
         stage('Test Application') {
 
             steps {
 
                 powershell '''
-                    python -m py_compile app.py
 
-                    Write-Host "Python syntax check passed."
+                    Write-Host "Testing Python application using Docker..."
+
+                    docker run --rm `
+                        -v "${PWD}:/app" `
+                        -w /app `
+                        python:3.12-slim `
+                        sh -c "pip install --no-cache-dir -r requirements.txt && python -m py_compile app.py"
+
+                    if ($LASTEXITCODE -ne 0) {
+
+                        Write-Error "Application test failed"
+
+                        exit 1
+                    }
+
+                    Write-Host ""
+                    Write-Host "Application test passed successfully."
+
                 '''
+
             }
         }
 
+
+        // ==========================================
+        // 4. BUILD DOCKER IMAGE
+        // ==========================================
 
         stage('Build Docker Image') {
 
             steps {
 
                 powershell """
+
+                    Write-Host "Building Docker image..."
+
                     docker build `
                         -t ${IMAGE_NAME}:${IMAGE_TAG} .
+
+                    if (`$LASTEXITCODE -ne 0) {
+
+                        Write-Error "Docker build failed"
+
+                        exit 1
+                    }
+
+
+                    Write-Host "Creating latest tag..."
 
                     docker tag `
                         ${IMAGE_NAME}:${IMAGE_TAG} `
                         ${IMAGE_NAME}:latest
+
+                    if (`$LASTEXITCODE -ne 0) {
+
+                        Write-Error "Docker tag failed"
+
+                        exit 1
+                    }
+
+
+                    Write-Host ""
+                    Write-Host "Docker image built successfully."
+
+                    docker images ${IMAGE_NAME}
+
                 """
+
             }
         }
 
 
-        /*
-         * Docker Hub login will be added
-         * after the application is tested.
-         */
+        // ==========================================
+        // 5. DOCKER HUB LOGIN
+        // ==========================================
 
         stage('Docker Hub Login') {
 
@@ -114,43 +161,48 @@ pipeline {
 
                     usernamePassword(
 
-                        credentialsId:
-                            'dockerhub-credentials',
+                        credentialsId: 'dockerhub-credentials',
 
-                        usernameVariable:
-                            'DOCKER_USERNAME',
+                        usernameVariable: 'DOCKER_USERNAME',
 
-                        passwordVariable:
-                            'DOCKER_PASSWORD'
+                        passwordVariable: 'DOCKER_PASSWORD'
+
                     )
 
                 ]) {
 
                     powershell '''
 
-                        Write-Host `
-                            "Logging into Docker Hub..."
+                        Write-Host "Logging into Docker Hub..."
 
                         $env:DOCKER_PASSWORD |
                             docker login `
                             --username $env:DOCKER_USERNAME `
                             --password-stdin
 
+
                         if ($LASTEXITCODE -ne 0) {
 
-                            Write-Error `
-                                "Docker login failed"
+                            Write-Error "Docker Hub login failed"
 
                             exit 1
                         }
 
-                        Write-Host `
-                            "Docker login successful"
+
+                        Write-Host ""
+                        Write-Host "Docker Hub login successful."
+
                     '''
+
                 }
+
             }
         }
 
+
+        // ==========================================
+        // 6. PUSH IMAGE TO DOCKER HUB
+        // ==========================================
 
         stage('Push Image') {
 
@@ -158,15 +210,47 @@ pipeline {
 
                 powershell """
 
+                    Write-Host "Pushing build image..."
+
                     docker push `
                         ${IMAGE_NAME}:${IMAGE_TAG}
 
+
+                    if (`$LASTEXITCODE -ne 0) {
+
+                        Write-Error "Build image push failed"
+
+                        exit 1
+                    }
+
+
+                    Write-Host ""
+                    Write-Host "Pushing latest image..."
+
                     docker push `
                         ${IMAGE_NAME}:latest
+
+
+                    if (`$LASTEXITCODE -ne 0) {
+
+                        Write-Error "Latest image push failed"
+
+                        exit 1
+                    }
+
+
+                    Write-Host ""
+                    Write-Host "Docker images pushed successfully."
+
                 """
+
             }
         }
 
+
+        // ==========================================
+        // 7. DEPLOY TO KUBERNETES
+        // ==========================================
 
         stage('Deploy') {
 
@@ -174,45 +258,125 @@ pipeline {
 
                 powershell '''
 
+                    Write-Host "Checking Kubernetes connection..."
+
+                    kubectl get nodes
+
+
+                    if ($LASTEXITCODE -ne 0) {
+
+                        Write-Error "Kubernetes is not available"
+
+                        exit 1
+                    }
+
+
+                    Write-Host ""
+                    Write-Host "Deploying application..."
+
+
                     kubectl apply `
                         -f kubernetes/deployment.yaml
+
+
+                    if ($LASTEXITCODE -ne 0) {
+
+                        Write-Error "Deployment failed"
+
+                        exit 1
+                    }
+
 
                     kubectl apply `
                         -f kubernetes/service.yaml
 
+
+                    if ($LASTEXITCODE -ne 0) {
+
+                        Write-Error "Service deployment failed"
+
+                        exit 1
+                    }
+
+
+                    Write-Host ""
+                    Write-Host "Waiting for deployment..."
+
+
                     kubectl rollout status `
-                        deployment/server-health-monitor
+                        deployment/server-health-monitor `
+                        --timeout=120s
+
+
+                    if ($LASTEXITCODE -ne 0) {
+
+                        Write-Error "Kubernetes rollout failed"
+
+                        exit 1
+                    }
+
+
+                    Write-Host ""
+                    Write-Host "Kubernetes deployment successful."
+
+
+                    Write-Host ""
+                    Write-Host "===== PODS ====="
 
                     kubectl get pods
 
-                    kubectl get service
+
+                    Write-Host ""
+                    Write-Host "===== SERVICE ====="
+
+                    kubectl get service server-health-monitor
+
                 '''
+
             }
         }
+
     }
 
+
+    // ==========================================
+    // POST ACTIONS
+    // ==========================================
 
     post {
 
         success {
 
             echo '''
-========================================
+==========================================
 SERVER HEALTH MONITOR
 BUILD SUCCESSFUL
-========================================
+==========================================
+
+Docker Image:
+jaganathbkavin/server-health-monitor
+
+Deployment:
+Kubernetes
+
+Status:
+SUCCESS
 '''
         }
+
 
         failure {
 
             echo '''
-========================================
+==========================================
 SERVER HEALTH MONITOR
 BUILD FAILED
-========================================
-Check Jenkins Console Output
+==========================================
+
+Please check the Jenkins Console Output.
 '''
         }
+
     }
+
 }
