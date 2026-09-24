@@ -4,7 +4,7 @@ pipeline {
 
     environment {
 
-        IMAGE_NAME = 'jaganathbkavin/server-health-monitor'
+        IMAGE_NAME = 'jaganathbkvin/server-health-monitor'
         IMAGE_TAG  = "build-${BUILD_NUMBER}"
 
     }
@@ -75,7 +75,7 @@ pipeline {
                     Write-Host "Building Docker image..."
 
                     docker build `
-                        -t "jaganathbkavin/server-health-monitor:build-$env:BUILD_NUMBER" .
+                        -t "jaganathbkvin/server-health-monitor:build-$env:BUILD_NUMBER" .
 
                     if ($LASTEXITCODE -ne 0) {
                         Write-Error "Docker build failed"
@@ -85,8 +85,8 @@ pipeline {
                     Write-Host "Creating latest tag..."
 
                     docker tag `
-                        "jaganathbkavin/server-health-monitor:build-$env:BUILD_NUMBER" `
-                        "jaganathbkavin/server-health-monitor:latest"
+                        "jaganathbkvin/server-health-monitor:build-$env:BUILD_NUMBER" `
+                        "jaganathbkvin/server-health-monitor:latest"
 
                     if ($LASTEXITCODE -ne 0) {
                         Write-Error "Docker tag failed"
@@ -96,7 +96,7 @@ pipeline {
                     Write-Host ""
                     Write-Host "Docker image built successfully."
 
-                    docker images "jaganathbkavin/server-health-monitor"
+                    docker images "jaganathbkvin/server-health-monitor"
                 '''
             }
         }
@@ -138,7 +138,7 @@ pipeline {
                     Write-Host "Pushing build image..."
 
                     docker push `
-                        "jaganathbkavin/server-health-monitor:build-$env:BUILD_NUMBER"
+                        "jaganathbkvin/server-health-monitor:build-$env:BUILD_NUMBER"
 
                     if ($LASTEXITCODE -ne 0) {
                         Write-Error "Build image push failed"
@@ -149,7 +149,7 @@ pipeline {
                     Write-Host "Pushing latest image..."
 
                     docker push `
-                        "jaganathbkavin/server-health-monitor:latest"
+                        "jaganathbkvin/server-health-monitor:latest"
 
                     if ($LASTEXITCODE -ne 0) {
                         Write-Error "Latest image push failed"
@@ -230,7 +230,7 @@ BUILD SUCCESSFUL
 ==========================================
 
 Docker Image:
-jaganathbkavin/server-health-monitor
+jaganathbkvin/server-health-monitor
 
 Deployment:
 Kubernetes
