@@ -1,3 +1,4 @@
+```groovy
 pipeline {
 
     agent any
@@ -14,12 +15,14 @@ pipeline {
         stage('Checkout') {
             steps {
                 echo 'Checking out source code...'
+
                 checkout scm
             }
         }
 
         stage('Verify Files') {
             steps {
+
                 powershell '''
                     Write-Host "Checking project files..."
 
@@ -33,6 +36,7 @@ pipeline {
                     )
 
                     foreach ($file in $requiredFiles) {
+
                         if (!(Test-Path $file)) {
                             Write-Error "$file NOT FOUND"
                             exit 1
@@ -49,6 +53,7 @@ pipeline {
 
         stage('Test Application') {
             steps {
+
                 powershell '''
                     Write-Host "Testing Python application using Docker..."
 
@@ -71,6 +76,7 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
+
                 powershell '''
                     Write-Host "Building Docker image..."
 
@@ -82,6 +88,7 @@ pipeline {
                         exit 1
                     }
 
+                    Write-Host ""
                     Write-Host "Creating latest tag..."
 
                     docker tag `
@@ -113,142 +120,9 @@ pipeline {
                 ]) {
 
                     powershell '''
-                        Write-Host "Logging into Docker Hub..."
-
-                        $env:DOCKER_PASSWORD |
-                            docker login `
-                            --username $env:DOCKER_USERNAME `
-                            --password-stdin
-
-                        if ($LASTEXITCODE -ne 0) {
-                            Write-Error "Docker Hub login failed"
-                            exit 1
-                        }
+                        Write-Host "=========================================="
+                        Write-Host "DOCKER HUB CREDENTIAL TEST"
+                        Write-Host "=========================================="
 
                         Write-Host ""
-                        Write-Host "Docker Hub login successful."
-                    '''
-                }
-            }
-        }
-
-        stage('Push Image') {
-            steps {
-                powershell '''
-                    Write-Host "Pushing build image..."
-
-                    docker push `
-                        "jaganathbkvin/server-health-monitor:build-$env:BUILD_NUMBER"
-
-                    if ($LASTEXITCODE -ne 0) {
-                        Write-Error "Build image push failed"
-                        exit 1
-                    }
-
-                    Write-Host ""
-                    Write-Host "Pushing latest image..."
-
-                    docker push `
-                        "jaganathbkvin/server-health-monitor:latest"
-
-                    if ($LASTEXITCODE -ne 0) {
-                        Write-Error "Latest image push failed"
-                        exit 1
-                    }
-
-                    Write-Host ""
-                    Write-Host "Docker images pushed successfully."
-                '''
-            }
-        }
-
-        stage('Deploy') {
-            steps {
-                powershell '''
-                    Write-Host "Checking Kubernetes connection..."
-
-                    kubectl get nodes
-
-                    if ($LASTEXITCODE -ne 0) {
-                        Write-Error "Kubernetes is not available"
-                        exit 1
-                    }
-
-                    Write-Host ""
-                    Write-Host "Deploying application..."
-
-                    kubectl apply `
-                        -f kubernetes/deployment.yaml
-
-                    if ($LASTEXITCODE -ne 0) {
-                        Write-Error "Deployment failed"
-                        exit 1
-                    }
-
-                    kubectl apply `
-                        -f kubernetes/service.yaml
-
-                    if ($LASTEXITCODE -ne 0) {
-                        Write-Error "Service deployment failed"
-                        exit 1
-                    }
-
-                    Write-Host ""
-                    Write-Host "Waiting for deployment..."
-
-                    kubectl rollout status `
-                        deployment/server-health-monitor `
-                        --timeout=120s
-
-                    if ($LASTEXITCODE -ne 0) {
-                        Write-Error "Kubernetes rollout failed"
-                        exit 1
-                    }
-
-                    Write-Host ""
-                    Write-Host "Kubernetes deployment successful."
-
-                    Write-Host ""
-                    Write-Host "===== PODS ====="
-                    kubectl get pods
-
-                    Write-Host ""
-                    Write-Host "===== SERVICE ====="
-                    kubectl get service server-health-monitor
-                '''
-            }
-        }
-    }
-
-    post {
-
-        success {
-            echo '''
-==========================================
-SERVER HEALTH MONITOR
-BUILD SUCCESSFUL
-==========================================
-
-Docker Image:
-jaganathbkvin/server-health-monitor
-
-Deployment:
-Kubernetes
-
-Status:
-SUCCESS
-'''
-        }
-
-        failure {
-            echo '''
-==========================================
-SERVER HEALTH MONITOR
-BUILD FAILED
-==========================================
-
-Please check the Jenkins Console Output.
-'''
-        }
-    }
-}
+```
