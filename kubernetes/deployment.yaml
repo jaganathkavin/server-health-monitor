@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: server-health-monitor
+
+spec:
+
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: server-health-monitor
+
+  template:
+
+    metadata:
+      labels:
+        app: server-health-monitor
+
+    spec:
+
+      containers:
+
+        - name: server-health-monitor
+
+          image: jaganathbkavin/server-health-monitor:latest
+
+          imagePullPolicy: Always
+
+          ports:
+
+            - containerPort: 5000
+
+          resources:
+
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
+          livenessProbe:
+
+            httpGet:
+              path: /health
+              port: 5000
+
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+          readinessProbe:
+
+            httpGet:
+              path: /health
+              port: 5000
+
+            initialDelaySeconds: 5
+            periodSeconds: 5
