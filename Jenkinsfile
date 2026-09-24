@@ -5,7 +5,7 @@ pipeline {
     environment {
 
         IMAGE_NAME =
-            'jaganathbkavin/server-health-monitor'
+            'jaganathbkvin/server-health-monitor'
 
         IMAGE_TAG =
             "build-${BUILD_NUMBER}"

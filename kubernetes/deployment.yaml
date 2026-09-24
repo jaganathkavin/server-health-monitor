@@ -24,7 +24,7 @@ spec:
 
         - name: server-health-monitor
 
-          image: jaganathbkavin/server-health-monitor:latest
+          image: jaganathbkvin/server-health-monitor:latest
 
           imagePullPolicy: Always
 
