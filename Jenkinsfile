@@ -1,4 +1,4 @@
-```groovy
+
 pipeline {
 
     agent any
@@ -125,4 +125,4 @@ pipeline {
                         Write-Host "=========================================="
 
                         Write-Host ""
-```
+
