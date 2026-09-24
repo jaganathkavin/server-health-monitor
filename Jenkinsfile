@@ -5,7 +5,7 @@ pipeline {
 
     environment {
         IMAGE_NAME = 'jaganathbkvin/server-health-monitor'
-        IMAGE_TAG  = "build-${BUILD_NUMBER}"
+        IMAGE_TAG = "build-${BUILD_NUMBER}"
     }
 
     stages {
@@ -33,20 +33,19 @@ pipeline {
                         throw "Dockerfile not found"
                     }
 
-                    if (!(Test-Path templates/index.html)) {
-                        throw "templates/index.html not found"
+                    if (!(Test-Path kubernetes/deployment.yaml)) {
+                        throw "kubernetes/deployment.yaml not found"
                     }
 
-                    if (!(Test-Path static/style.css)) {
-                        throw "static/style.css not found"
+                    if (!(Test-Path kubernetes/service.yaml)) {
+                        throw "kubernetes/service.yaml not found"
                     }
 
-                    if (!(Test-Path static/script.js)) {
-                        throw "static/script.js not found"
+                    if (!(Test-Path kubernetes/ingress.yaml)) {
+                        throw "kubernetes/ingress.yaml not found"
                     }
 
-                    Write-Host ""
-                    Write-Host "Files verified successfully"
+                    Write-Host "All required files found successfully."
                 '''
             }
         }
@@ -60,14 +59,13 @@ pipeline {
                         -v "${PWD}:/app" `
                         -w /app `
                         python:3.12-slim `
-                        sh -c "pip install --no-cache-dir -r requirements.txt && python -m py_compile app.py"
+                        bash -c "pip install --no-cache-dir -r requirements.txt && python -m py_compile app.py"
 
                     if ($LASTEXITCODE -ne 0) {
                         throw "Application test failed"
                     }
 
-                    Write-Host ""
-                    Write-Host "Application test passed successfully"
+                    Write-Host "Application test passed."
                 '''
             }
         }
@@ -75,43 +73,22 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 powershell '''
-                    Write-Host ""
-                    Write-Host "======================================"
-                    Write-Host "BUILDING DOCKER IMAGE"
-                    Write-Host "======================================"
+                    Write-Host "Building Docker image..."
 
-                    Write-Host ""
-                    Write-Host "Building:"
-                    Write-Host "jaganathbkvin/server-health-monitor:build-$env:BUILD_NUMBER"
-
-                    docker build `
-                        -t "jaganathbkvin/server-health-monitor:build-$env:BUILD_NUMBER" .
-
+                    docker build -t jaganathbkvin/server-health-monitor:${env:IMAGE_TAG} .
                     if ($LASTEXITCODE -ne 0) {
                         throw "Docker build failed"
                     }
 
-                    Write-Host ""
-                    Write-Host "Docker build successful"
-
-                    Write-Host ""
-                    Write-Host "Creating latest tag..."
-
                     docker tag `
-                        "jaganathbkvin/server-health-monitor:build-$env:BUILD_NUMBER" `
-                        "jaganathbkvin/server-health-monitor:latest"
+                        jaganathbkvin/server-health-monitor:${env:IMAGE_TAG} `
+                        jaganathbkvin/server-health-monitor:latest
 
                     if ($LASTEXITCODE -ne 0) {
                         throw "Docker tag failed"
                     }
 
-                    Write-Host ""
-                    Write-Host "Docker tag successful"
-
-                    Write-Host ""
-                    Write-Host "Available images:"
-
-                    docker images "jaganathbkvin/server-health-monitor"
+                    Write-Host "Docker image built successfully."
                 '''
             }
         }
@@ -125,17 +102,7 @@ pipeline {
                         passwordVariable: 'DOCKER_PASSWORD'
                     )
                 ]) {
-
                     powershell '''
-                        Write-Host ""
-                        Write-Host "======================================"
-                        Write-Host "DOCKER HUB LOGIN"
-                        Write-Host "======================================"
-
-                        Write-Host ""
-                        Write-Host "Username: $env:DOCKER_USERNAME"
-
-                        Write-Host ""
                         Write-Host "Logging into Docker Hub..."
 
                         docker login `
@@ -146,8 +113,7 @@ pipeline {
                             throw "Docker Hub login failed"
                         }
 
-                        Write-Host ""
-                        Write-Host "Docker login successful"
+                        Write-Host "Docker Hub login successful."
                     '''
                 }
             }
@@ -156,83 +122,109 @@ pipeline {
         stage('Push Image') {
             steps {
                 powershell '''
-                    Write-Host ""
-                    Write-Host "======================================"
-                    Write-Host "PUSHING DOCKER IMAGES"
-                    Write-Host "======================================"
-
-                    Write-Host ""
                     Write-Host "Pushing build image..."
 
-                    docker push `
-                        "jaganathbkvin/server-health-monitor:build-$env:BUILD_NUMBER"
+                    docker push "jaganathbkvin/server-health-monitor:${env:IMAGE_TAG}"
 
                     if ($LASTEXITCODE -ne 0) {
-                        throw "Build image push failed"
+                        throw "Docker build image push failed"
                     }
 
-                    Write-Host ""
-                    Write-Host "Build image pushed successfully"
-
-                    Write-Host ""
                     Write-Host "Pushing latest image..."
 
-                    docker push `
-                        "jaganathbkvin/server-health-monitor:latest"
+                    docker push "jaganathbkvin/server-health-monitor:latest"
 
                     if ($LASTEXITCODE -ne 0) {
-                        throw "Latest image push failed"
+                        throw "Docker latest image push failed"
                     }
 
-                    Write-Host ""
-                    Write-Host "Latest image pushed successfully"
-
-                    Write-Host ""
-                    Write-Host "Both images pushed successfully"
+                    Write-Host "Docker images pushed successfully."
                 '''
             }
         }
 
-        stage('Deploy') {
+        stage('Deploy to Kubernetes') {
             steps {
                 powershell '''
-                    Write-Host ""
                     Write-Host "======================================"
-                    Write-Host "DEPLOYING APPLICATION"
+                    Write-Host "DEPLOYING TO KUBERNETES"
                     Write-Host "======================================"
 
-                    Write-Host ""
-                    Write-Host "Removing old container..."
+                    Write-Host "Checking kubectl..."
 
-                    docker rm -f server-health-monitor 2>$null
-
-                    Write-Host ""
-                    Write-Host "Starting new container..."
-
-                    docker run -d `
-                        --name server-health-monitor `
-                        -p 5000:5000 `
-                        jaganathbkvin/server-health-monitor:latest
+                    kubectl version --client
 
                     if ($LASTEXITCODE -ne 0) {
-                        throw "Docker container deployment failed"
+                        throw "kubectl is not available"
                     }
 
-                    Write-Host ""
-                    Write-Host "Application deployed successfully"
+                    Write-Host "Checking Kubernetes cluster..."
 
-                    Write-Host ""
-                    Write-Host "Container status:"
+                    kubectl get nodes
 
-                    docker ps --filter name=server-health-monitor
+                    if ($LASTEXITCODE -ne 0) {
+                        throw "Cannot connect to Kubernetes cluster"
+                    }
 
-                    Write-Host ""
+                    Write-Host "Applying Deployment..."
+
+                    kubectl apply -f kubernetes/deployment.yaml
+
+                    if ($LASTEXITCODE -ne 0) {
+                        throw "Kubernetes Deployment failed"
+                    }
+
+                    Write-Host "Applying Service..."
+
+                    kubectl apply -f kubernetes/service.yaml
+
+                    if ($LASTEXITCODE -ne 0) {
+                        throw "Kubernetes Service failed"
+                    }
+
+                    Write-Host "Applying Ingress..."
+
+                    kubectl apply -f kubernetes/ingress.yaml
+
+                    if ($LASTEXITCODE -ne 0) {
+                        throw "Kubernetes Ingress failed"
+                    }
+
+                    Write-Host "Waiting for Kubernetes rollout..."
+
+                    kubectl rollout status deployment/server-health-monitor --timeout=120s
+
+                    if ($LASTEXITCODE -ne 0) {
+                        throw "Kubernetes rollout failed"
+                    }
+
                     Write-Host "======================================"
-                    Write-Host "APPLICATION URL"
+                    Write-Host "KUBERNETES PODS"
                     Write-Host "======================================"
 
-                    Write-Host ""
-                    Write-Host "http://localhost:5000"
+                    kubectl get pods -o wide
+
+                    Write-Host "======================================"
+                    Write-Host "KUBERNETES DEPLOYMENT"
+                    Write-Host "======================================"
+
+                    kubectl get deployment
+
+                    Write-Host "======================================"
+                    Write-Host "KUBERNETES SERVICE"
+                    Write-Host "======================================"
+
+                    kubectl get service
+
+                    Write-Host "======================================"
+                    Write-Host "KUBERNETES INGRESS"
+                    Write-Host "======================================"
+
+                    kubectl get ingress
+
+                    Write-Host "======================================"
+                    Write-Host "KUBERNETES DEPLOYMENT SUCCESSFUL"
+                    Write-Host "======================================"
                 '''
             }
         }
@@ -242,34 +234,35 @@ pipeline {
 
         success {
             echo '''
-======================================
+==========================================
 BUILD SUCCESSFUL
-======================================
+==========================================
 
-SERVER HEALTH MONITOR DEPLOYED
+SERVER HEALTH MONITOR
 
 Docker Image:
-jaganathbkvin/server-health-monitor
+jaganathbkvin/server-health-monitor:latest
 
-Docker Hub:
-PUSH SUCCESSFUL
+Kubernetes:
+Deployment: server-health-monitor
+Replicas: 2
+Service: server-health-monitor
+NodePort: 30080
+Ingress: health.local
 
-Application:
-http://localhost:5000
-
-======================================
+==========================================
 '''
         }
 
         failure {
             echo '''
-======================================
+==========================================
 BUILD FAILED
-======================================
+==========================================
 
-Check Jenkins Console Output.
+Check the Jenkins Console Output.
 
-======================================
+==========================================
 '''
         }
     }
