@@ -5,7 +5,7 @@ pipeline {
 
     environment {
         IMAGE_NAME = 'jaganathbkvin/server-health-monitor'
-        IMAGE_TAG = "build-${BUILD_NUMBER}"
+        IMAGE_TAG  = "build-${BUILD_NUMBER}"
     }
 
     stages {
@@ -74,29 +74,45 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                powershell """
-                    Write-Host "Building Docker image..."
+                powershell '''
+                    Write-Host ""
+                    Write-Host "======================================"
+                    Write-Host "BUILDING DOCKER IMAGE"
+                    Write-Host "======================================"
 
-                    docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+                    Write-Host ""
+                    Write-Host "Building:"
+                    Write-Host "jaganathbkvin/server-health-monitor:build-$env:BUILD_NUMBER"
 
-                    if (`$LASTEXITCODE -ne 0) {
+                    docker build `
+                        -t "jaganathbkvin/server-health-monitor:build-$env:BUILD_NUMBER" .
+
+                    if ($LASTEXITCODE -ne 0) {
                         throw "Docker build failed"
                     }
 
                     Write-Host ""
+                    Write-Host "Docker build successful"
+
+                    Write-Host ""
                     Write-Host "Creating latest tag..."
 
-                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest
+                    docker tag `
+                        "jaganathbkvin/server-health-monitor:build-$env:BUILD_NUMBER" `
+                        "jaganathbkvin/server-health-monitor:latest"
 
-                    if (`$LASTEXITCODE -ne 0) {
+                    if ($LASTEXITCODE -ne 0) {
                         throw "Docker tag failed"
                     }
 
                     Write-Host ""
-                    Write-Host "Docker image built successfully"
+                    Write-Host "Docker tag successful"
 
-                    docker images ${IMAGE_NAME}
-                """
+                    Write-Host ""
+                    Write-Host "Available images:"
+
+                    docker images "jaganathbkvin/server-health-monitor"
+                '''
             }
         }
 
@@ -109,6 +125,7 @@ pipeline {
                         passwordVariable: 'DOCKER_PASSWORD'
                     )
                 ]) {
+
                     powershell '''
                         Write-Host ""
                         Write-Host "======================================"
@@ -138,7 +155,7 @@ pipeline {
 
         stage('Push Image') {
             steps {
-                powershell """
+                powershell '''
                     Write-Host ""
                     Write-Host "======================================"
                     Write-Host "PUSHING DOCKER IMAGES"
@@ -147,24 +164,32 @@ pipeline {
                     Write-Host ""
                     Write-Host "Pushing build image..."
 
-                    docker push ${IMAGE_NAME}:${IMAGE_TAG}
+                    docker push `
+                        "jaganathbkvin/server-health-monitor:build-$env:BUILD_NUMBER"
 
-                    if (`$LASTEXITCODE -ne 0) {
+                    if ($LASTEXITCODE -ne 0) {
                         throw "Build image push failed"
                     }
 
                     Write-Host ""
+                    Write-Host "Build image pushed successfully"
+
+                    Write-Host ""
                     Write-Host "Pushing latest image..."
 
-                    docker push ${IMAGE_NAME}:latest
+                    docker push `
+                        "jaganathbkvin/server-health-monitor:latest"
 
-                    if (`$LASTEXITCODE -ne 0) {
+                    if ($LASTEXITCODE -ne 0) {
                         throw "Latest image push failed"
                     }
 
                     Write-Host ""
-                    Write-Host "Images pushed successfully"
-                """
+                    Write-Host "Latest image pushed successfully"
+
+                    Write-Host ""
+                    Write-Host "Both images pushed successfully"
+                '''
             }
         }
 
@@ -202,7 +227,11 @@ pipeline {
                     docker ps --filter name=server-health-monitor
 
                     Write-Host ""
-                    Write-Host "Application URL:"
+                    Write-Host "======================================"
+                    Write-Host "APPLICATION URL"
+                    Write-Host "======================================"
+
+                    Write-Host ""
                     Write-Host "http://localhost:5000"
                 '''
             }
@@ -245,3 +274,39 @@ Check Jenkins Console Output.
         }
     }
 }
+
+### Now the expected flow
+
+```text
+Checkout
+   ↓
+Verify Files ✅
+   ↓
+Test Application ✅
+   ↓
+Build Docker Image  ← this will now actually run
+   ↓
+Docker Hub Login
+   ↓
+Push Image
+   ↓
+Deploy Container
+   ↓
+http://localhost:5000
+```
+
+**Run this version.**
+
+The most important thing in your next console output is whether you reach:
+
+```text
+Docker build successful
+```
+
+and then:
+
+```text
+DOCKER HUB LOGIN
+```
+
+If it reaches Docker Hub Login and fails there, **then we continue the authentication investigation**.
