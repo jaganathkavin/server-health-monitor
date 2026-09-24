@@ -108,6 +108,60 @@ pipeline {
             }
         }
 
+        stage('Check Jenkins Credential') {
+            steps {
+
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-login-2026',
+                        usernameVariable: 'DOCKER_USERNAME',
+                        passwordVariable: 'DOCKER_PASSWORD'
+                    )
+                ]) {
+
+                    powershell '''
+                        Write-Host ""
+                        Write-Host "=========================================="
+                        Write-Host "JENKINS CREDENTIAL CHECK"
+                        Write-Host "=========================================="
+
+                        Write-Host ""
+                        Write-Host "Username: [$env:DOCKER_USERNAME]"
+                        Write-Host "Username length: $($env:DOCKER_USERNAME.Length)"
+
+                        Write-Host ""
+                        Write-Host "Password length: $($env:DOCKER_PASSWORD.Length)"
+
+                        if ([string]::IsNullOrWhiteSpace($env:DOCKER_PASSWORD)) {
+                            Write-Error "PASSWORD/PAT IS EMPTY"
+                            exit 1
+                        }
+
+                        $bytes = [System.Text.Encoding]::UTF8.GetBytes(
+                            $env:DOCKER_PASSWORD
+                        )
+
+                        $sha256 = [System.Security.Cryptography.SHA256]::Create()
+
+                        $hash = $sha256.ComputeHash($bytes)
+
+                        $hashString = [System.BitConverter]::ToString(
+                            $hash
+                        ).Replace("-", "").ToLower()
+
+                        Write-Host ""
+                        Write-Host "Password SHA256: $hashString"
+
+                        Write-Host ""
+                        Write-Host "PAT itself is NOT displayed."
+
+                        Write-Host ""
+                        Write-Host "=========================================="
+                    '''
+                }
+            }
+        }
+
         stage('Docker Hub Login') {
             steps {
 
@@ -120,32 +174,13 @@ pipeline {
                 ]) {
 
                     powershell '''
+                        Write-Host ""
                         Write-Host "=========================================="
-                        Write-Host "DOCKER HUB CREDENTIAL TEST"
+                        Write-Host "DOCKER HUB LOGIN"
                         Write-Host "=========================================="
 
                         Write-Host ""
                         Write-Host "Username: [$env:DOCKER_USERNAME]"
-                        Write-Host "Username length: $($env:DOCKER_USERNAME.Length)"
-                        Write-Host "Password length: $($env:DOCKER_PASSWORD.Length)"
-
-                        Write-Host ""
-                        Write-Host "Expected username: jaganathbkvin"
-
-                        if ($env:DOCKER_USERNAME -ne "jaganathbkvin") {
-                            Write-Error "USERNAME IS WRONG"
-                            exit 1
-                        }
-
-                        if ([string]::IsNullOrWhiteSpace($env:DOCKER_PASSWORD)) {
-                            Write-Error "PASSWORD/PAT IS EMPTY"
-                            exit 1
-                        }
-
-                        Write-Host ""
-                        Write-Host "Username is correct."
-                        Write-Host "PAT exists."
-                        Write-Host "PAT itself will NOT be displayed."
 
                         Write-Host ""
                         Write-Host "Logging into Docker Hub..."
@@ -171,6 +206,7 @@ pipeline {
             steps {
 
                 powershell '''
+                    Write-Host ""
                     Write-Host "=========================================="
                     Write-Host "PUSHING DOCKER IMAGE"
                     Write-Host "=========================================="
@@ -210,6 +246,7 @@ pipeline {
             steps {
 
                 powershell '''
+                    Write-Host ""
                     Write-Host "=========================================="
                     Write-Host "KUBERNETES DEPLOYMENT"
                     Write-Host "=========================================="
@@ -326,5 +363,3 @@ Please check the Jenkins Console Output.
         }
     }
 }
-
-
