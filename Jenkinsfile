@@ -257,5 +257,4 @@ pipeline {
                             exit 1
                         }
 
-                        Write-Host ""
-                        Write-Host "Docker Hub login successful."
+                
