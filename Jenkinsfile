@@ -14,6 +14,7 @@ pipeline {
 
         stage('Checkout') {
             steps {
+
                 echo 'Checking out source code...'
 
                 checkout scm
@@ -108,6 +109,67 @@ pipeline {
             }
         }
 
+        stage('Diagnose Docker Environment') {
+            steps {
+
+                powershell '''
+                    Write-Host ""
+                    Write-Host "=========================================="
+                    Write-Host "DOCKER ENVIRONMENT"
+                    Write-Host "=========================================="
+
+                    Write-Host ""
+                    Write-Host "Windows User:"
+                    whoami
+
+                    Write-Host ""
+                    Write-Host "USERPROFILE:"
+                    Write-Host $env:USERPROFILE
+
+                    Write-Host ""
+                    Write-Host "DOCKER_CONFIG:"
+                    if ($env:DOCKER_CONFIG) {
+                        Write-Host $env:DOCKER_CONFIG
+                    }
+                    else {
+                        Write-Host "(Not set)"
+                    }
+
+                    Write-Host ""
+                    Write-Host "Docker Context:"
+                    docker context show
+
+                    if ($LASTEXITCODE -ne 0) {
+                        Write-Error "Docker context check failed"
+                        exit 1
+                    }
+
+                    Write-Host ""
+                    Write-Host "Docker Version:"
+                    docker version
+
+                    if ($LASTEXITCODE -ne 0) {
+                        Write-Error "Docker version check failed"
+                        exit 1
+                    }
+
+                    Write-Host ""
+                    Write-Host "Docker Info:"
+                    docker info
+
+                    if ($LASTEXITCODE -ne 0) {
+                        Write-Error "Docker info check failed"
+                        exit 1
+                    }
+
+                    Write-Host ""
+                    Write-Host "=========================================="
+                    Write-Host "DOCKER ENVIRONMENT CHECK COMPLETE"
+                    Write-Host "=========================================="
+                '''
+            }
+        }
+
         stage('Check Jenkins Credential') {
             steps {
 
@@ -173,193 +235,4 @@ pipeline {
                     )
                 ]) {
 
-                    powershell '''
-                        Write-Host ""
-                        Write-Host "=========================================="
-                        Write-Host "DOCKER HUB LOGIN"
-                        Write-Host "=========================================="
-
-                        Write-Host ""
-                        Write-Host "Username: [$env:DOCKER_USERNAME]"
-
-                        Write-Host ""
-                        Write-Host "Logging into Docker Hub..."
-
-                        $env:DOCKER_PASSWORD |
-                            docker login `
-                            --username $env:DOCKER_USERNAME `
-                            --password-stdin
-
-                        if ($LASTEXITCODE -ne 0) {
-                            Write-Error "Docker Hub login failed"
-                            exit 1
-                        }
-
-                        Write-Host ""
-                        Write-Host "Docker Hub login successful."
-                    '''
-                }
-            }
-        }
-
-        stage('Push Image') {
-            steps {
-
-                powershell '''
-                    Write-Host ""
-                    Write-Host "=========================================="
-                    Write-Host "PUSHING DOCKER IMAGE"
-                    Write-Host "=========================================="
-
-                    Write-Host ""
-                    Write-Host "Pushing build image..."
-
-                    docker push `
-                        "jaganathbkvin/server-health-monitor:build-$env:BUILD_NUMBER"
-
-                    if ($LASTEXITCODE -ne 0) {
-                        Write-Error "Build image push failed"
-                        exit 1
-                    }
-
-                    Write-Host ""
-                    Write-Host "Build image pushed successfully."
-
-                    Write-Host ""
-                    Write-Host "Pushing latest image..."
-
-                    docker push `
-                        "jaganathbkvin/server-health-monitor:latest"
-
-                    if ($LASTEXITCODE -ne 0) {
-                        Write-Error "Latest image push failed"
-                        exit 1
-                    }
-
-                    Write-Host ""
-                    Write-Host "Docker images pushed successfully."
-                '''
-            }
-        }
-
-        stage('Deploy') {
-            steps {
-
-                powershell '''
-                    Write-Host ""
-                    Write-Host "=========================================="
-                    Write-Host "KUBERNETES DEPLOYMENT"
-                    Write-Host "=========================================="
-
-                    Write-Host ""
-                    Write-Host "Checking Kubernetes connection..."
-
-                    kubectl get nodes
-
-                    if ($LASTEXITCODE -ne 0) {
-                        Write-Error "Kubernetes is not available"
-                        exit 1
-                    }
-
-                    Write-Host ""
-                    Write-Host "Kubernetes connection successful."
-
-                    Write-Host ""
-                    Write-Host "Applying Deployment..."
-
-                    kubectl apply `
-                        -f kubernetes/deployment.yaml
-
-                    if ($LASTEXITCODE -ne 0) {
-                        Write-Error "Kubernetes Deployment failed"
-                        exit 1
-                    }
-
-                    Write-Host ""
-                    Write-Host "Applying Service..."
-
-                    kubectl apply `
-                        -f kubernetes/service.yaml
-
-                    if ($LASTEXITCODE -ne 0) {
-                        Write-Error "Kubernetes Service deployment failed"
-                        exit 1
-                    }
-
-                    Write-Host ""
-                    Write-Host "Waiting for deployment..."
-
-                    kubectl rollout status `
-                        deployment/server-health-monitor `
-                        --timeout=120s
-
-                    if ($LASTEXITCODE -ne 0) {
-                        Write-Error "Kubernetes rollout failed"
-                        exit 1
-                    }
-
-                    Write-Host ""
-                    Write-Host "Kubernetes deployment successful."
-
-                    Write-Host ""
-                    Write-Host "=========================================="
-                    Write-Host "PODS"
-                    Write-Host "=========================================="
-
-                    kubectl get pods
-
-                    Write-Host ""
-                    Write-Host "=========================================="
-                    Write-Host "SERVICE"
-                    Write-Host "=========================================="
-
-                    kubectl get service server-health-monitor
-
-                    Write-Host ""
-                    Write-Host "=========================================="
-                    Write-Host "DEPLOYMENT"
-                    Write-Host "=========================================="
-
-                    kubectl get deployment server-health-monitor
-                '''
-            }
-        }
-    }
-
-    post {
-
-        success {
-
-            echo '''
-==========================================
-SERVER HEALTH MONITOR
-BUILD SUCCESSFUL
-==========================================
-
-Docker Image:
-jaganathbkvin/server-health-monitor
-
-Docker Hub:
-PUSH SUCCESSFUL
-
-Kubernetes:
-DEPLOYMENT SUCCESSFUL
-
-Status:
-SUCCESS
-'''
-        }
-
-        failure {
-
-            echo '''
-==========================================
-SERVER HEALTH MONITOR
-BUILD FAILED
-==========================================
-
-Please check the Jenkins Console Output.
-'''
-        }
-    }
-}
+                    
