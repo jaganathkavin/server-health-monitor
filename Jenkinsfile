@@ -328,32 +328,3 @@ Please check the Jenkins Console Output.
 }
 
 
-### What to do now
-
-1. Replace your GitHub `Jenkinsfile` with the above.
-2. Commit and push it.
-3. Jenkins → **Build Now**.
-4. Look specifically at:
-
-```text
-DOCKER HUB CREDENTIAL TEST
-```
-
-You should see:
-
-```text
-Username: [jaganathbkvin]
-Username length: 13
-Password length: ...
-Username is correct.
-PAT exists.
-```
-
-Then:
-
-```text
-Logging into Docker Hub...
-Login Succeeded
-```
-
-**Do not send the password/PAT to me.** Send me the Jenkins output from `DOCKER HUB CREDENTIAL TEST` onward.
