@@ -275,38 +275,3 @@ Check Jenkins Console Output.
     }
 }
 
-### Now the expected flow
-
-```text
-Checkout
-   ↓
-Verify Files ✅
-   ↓
-Test Application ✅
-   ↓
-Build Docker Image  ← this will now actually run
-   ↓
-Docker Hub Login
-   ↓
-Push Image
-   ↓
-Deploy Container
-   ↓
-http://localhost:5000
-```
-
-**Run this version.**
-
-The most important thing in your next console output is whether you reach:
-
-```text
-Docker build successful
-```
-
-and then:
-
-```text
-DOCKER HUB LOGIN
-```
-
-If it reaches Docker Hub Login and fails there, **then we continue the authentication investigation**.
